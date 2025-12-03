@@ -444,8 +444,9 @@ def main():
     - carrega transações e inventário do Cosmos DB,
     - exibe o menu lateral com navegação para as áreas principais:
       "Visão Geral", "Estoque & Compras", "Receitas & Produtos", "Vendas" e "Desperdícios",
-    - trata ações do usuário (adicionar compras, ler nota via OCR/IA, criar/editar
-      receitas, registrar vendas e desperdícios, ajustar/normalizar estoque),
+    - trata ações do usuário (adicionar compras, ler nota via OCR/IA, permitindo excluir
+      itens antes de salvar, criar/editar receitas, registrar vendas e desperdícios,
+      ajustar/normalizar estoque),
     - persiste alterações chamando funções auxiliares como `save_transaction`,
       `delete_transaction`, `update_product_name`, `get_transactions` e `get_inventory_dataframe`.
 
@@ -722,10 +723,12 @@ def main():
                         if 'count' not in df_items.columns: df_items['count'] = 1.0
                         if 'unit_size' not in df_items.columns: df_items['unit_size'] = 0.0
                         df_items['calc_total_qty'] = df_items['count'] * df_items['unit_size']
+                        df_items['excluir'] = False
 
                         edited = st.data_editor(
                             df_items, num_rows="dynamic", width='stretch',
                             column_config={
+                                "excluir": st.column_config.CheckboxColumn("Excluir?", default=False),
                                 "name": "Produto",
                                 "count": st.column_config.NumberColumn("Qtd", min_value=0.1, format="%.1f"),
                                 "unit_size": st.column_config.NumberColumn("Tam. Unit", min_value=0.0, format="%.1f"),
@@ -734,7 +737,7 @@ def main():
                                 "calc_total_qty": st.column_config.NumberColumn("Total", disabled=True, format="%.1f"),
                                 "total": st.column_config.NumberColumn("Preço (R$)", format="R$ %.2f")
                             },
-                            column_order=("name", "count", "unit_size", "unit", "calc_total_qty", "total")
+                            column_order=("excluir", "name", "count", "unit_size", "unit", "calc_total_qty", "total")
                         )
                         
                         confirmed = st.checkbox("✅ Confirmar dados")
@@ -742,6 +745,9 @@ def main():
                         if st.form_submit_button("Salvar"):
                             if confirmed:
                                 for _, row in edited.iterrows():
+                                    if row.get('excluir', False):
+                                        continue
+
                                     final_qty = float(row['count']) if row.get('unit') == 'UN' else float(
                                         row['count']) * float(row['unit_size'])
                                     unit_price = float(row.get('unit_price', 0))
